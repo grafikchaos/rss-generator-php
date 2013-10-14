@@ -1,103 +1,116 @@
 <?php
+
 class RssGenerator
 {
-    var $_encoding = 'UTF-8';
-    var $_title = 'YOUR_WEBSITE_TITLE';
-    var $_language = 'zh-tw';
-    var $_description = 'YOUR_DESCRIPTION';
-    var $_link = 'http://example.com/';
-    var $_ttl  = 10; // minutes
-    var $_generator = 'YOUR_NAME';
-    var $_version = '2.0';
+    public $encoding            = 'UTF-8';
+    public $title               = 'YOUR_WEBSITE_TITLE';
+    public $subtitle            = 'YOUR_SUBITILE';
+    public $language            = 'zh-tw';
+    public $description         = 'YOUR_DESCRIPTION';
+    public $link                = 'http://example.com/';
+    public $ttl                 = 10; // minutes
+    public $generator           = 'YOUR_NAME';
+    public $version             = '2.0';
+    public $rssXmlnsAttributes  = '';
 
-    function RssGenerator()
+    public function RssGenerator()
     {
     }
 
-    function set($name, $value)
+    public function set($name, $value)
     {
-        if ($name == 'encoding')
-            $this->_encoding = stripslashes($value);
-
-        if ($name == 'title')
-            $this->_title = stripslashes($value);
-
-        if ($name == 'language')
-            $this->_language = stripslashes($value);
-
-        if ($name == 'description')
-            $this->_description = stripslashes($value);
-
-        if ($name == 'generator')
-            $this->_generator = stripslashes($value);
-
-        if ($name == 'link')
-            $this->_link = stripslashes($value);
-
-        if ($name == 'ttl')
-            $this->_ttl = stripslashes($value);
+        $this->$name = $this->sanitize($value);
     }
 
     /**
      * Make an xml document of the rss stream
-     * @param: items: n row of associative array with theses field:
-     * @param: title: title of the item
-     * @param: description: short description of the item
-     * @param: link: url to show the item
-     * @param: pubData: publication timestamp of the item
-     * @res: xml document of rss
+     *
+     * @param   array   $items  # n row of associative array with theses field:
+     * @return  string          # xml document of rss
      */
-    function get($items)
+    public function generateRssXml($items)
     {
-        $res='';
+        $xml = '';
 
         // header
-        $res .= "<?xml version=\"1.0\" encoding=\"" . $this->_encoding . "\"?>\n";
-        $res .= "<rss version=\"2.0\">\n";
-        $res .= "\t<channel>\n";
-        $res .= "\t\t<title><![CDATA[" . $this->_title . "]]></title>\n";
-        $res .= "\t\t<description><![CDATA[" . $this->_description . "]]></description>\n";
-        $res .= "\t\t<link><![CDATA[" . $this->_link . "]]></link>\n";
-        $res .= "\t\t<language>" . $this->_language . "</language>\n";
-        $res .= "\t\t<lastBuildDate>" . date(DATE_RSS) . "</lastBuildDate>\n";
-        $res .= "\t\t<ttl>" . $this->_ttl . "</ttl>\n";
-        $res .= "\t\t<generator><![CDATA[" . $this->_generator . "]]></generator>\n";
+        $xml .= "<?xml version=\"1.0\" encoding=\"" . $this->encoding . "\"?>\n";
+        $xml .= $this->getRssXmlTag();
+        $xml .= "\t<channel>\n";
+        // common channel elements shared across all items
+        $xml .= $this->getChannelXmlHeaders();
+        // loop through the items to create each <item>...</item> node
+        $xml .= $this->getItemsXml($items);
+        // close the channel tag
+        $xml .= "\t</channel>\n";
+        // close the rss tag
+        $xml .= "</rss>\n";
 
-        // items
+        return $xml;
+    }
+
+
+    public function getRssXmlTag()
+    {
+        if (!empty($this->rssXmlnsAttributes)) {
+            $escaped_attributes = addslashes($this->rssXmlnsAttributes);
+        }
+        $xml = "<rss {$escaped_attributes} version=\"{$this->version}\">\n";
+        return $xml;
+    }
+
+    public function getChannelXmlHeaders()
+    {
+        $xml = '';
+        $xml .= "\t\t<title><![CDATA[" . $this->title . "]]></title>\n";
+        $xml .= "\t\t<description><![CDATA[" . $this->description . "]]></description>\n";
+        $xml .= "\t\t<link><![CDATA[" . $this->link . "]]></link>\n";
+        $xml .= "\t\t<language>" . $this->language . "</language>\n";
+        $xml .= "\t\t<lastBuildDate>" . date(DATE_RSS) . "</lastBuildDate>\n";
+        $xml .= "\t\t<ttl>" . $this->ttl . "</ttl>\n";
+        $xml .= "\t\t<generator><![CDATA[" . $this->generator . "]]></generator>\n";
+
+        return $xml;
+    }
+
+    public function getItemsXml(array $items = array())
+    {
+        $xml = '';
         foreach ($items as $item) {
-            $res.="\t\t<item>\n";
+            $xml .= "\t\t<item>\n";
             foreach ($item as $key => $val) {
                 switch($key) {
                     case 'title':
-                        $res .= "\t\t\t<title><![CDATA[" . stripslashes($val) . "]]></title>\n";
+                        $xml .= "\t\t\t<title><![CDATA[" . $this->sanitize($val) . "]]></title>\n";
                         break;
 
                     case 'description':
-                        $res .= "\t\t\t<description><![CDATA[" . stripslashes($val) . "]]></description>\n";
+                        $xml .= "\t\t\t<description><![CDATA[" . $this->sanitize($val) . "]]></description>\n";
                         break;
 
                     case 'link':
                         if (!empty($val))
-                            $res .= "\t\t\t<link><![CDATA[" . stripslashes($val) . "]]></link>\n";
+                            $xml .= "\t\t\t<link><![CDATA[" . $this->sanitize($val) . "]]></link>\n";
                         break;
 
                     case 'pubDate':
                         if (!empty($val))
-                            $res .= "\t\t\t<pubDate>" . date(DATE_RSS, strtotime($val)) . "</pubDate>\n";
+                            $xml .= "\t\t\t<pubDate>" . date(DATE_RSS, strtotime($val)) . "</pubDate>\n";
                         break;
 
                     default:
-                        $res .= "\t\t\t<$key><![CDATA[" . stripslashes($val) . "]]></$key>\n";
+                        $xml .= "\t\t\t<$key><![CDATA[" . $this->sanitize($val) . "]]></$key>\n";
                         break;
                 }
             }
-            $res .= "\t\t</item>\n";
+            $xml .= "\t\t</item>\n";
         }
 
-        $res .= "\t</channel>\n";
-        $res .= "</rss>\n";
-
-        return $res;
+        return $xml;
     }
+
+    public function sanitize($val)
+    {
+        return stripslashes($val);
+    }
+
 }
-?>
